@@ -158,6 +158,16 @@ async function connect() {
   }, 30000);
 }
 
+
+// ── HTTP Server عشان Render ما يوقف البوت ──
+const http = require('http');
+http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('🤖 Kick Bot شغّال!');
+}).listen(process.env.PORT || 3000, () => {
+  console.log('🌐 HTTP Server شغّال');
+});
+
 // ── تشغيل ──
 console.log('🤖 Kick Bot يبدأ...');
 console.log(`📡 القناة: ${KICK_CHANNEL}`);
