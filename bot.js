@@ -33,6 +33,60 @@ async function addPoints(username, amount, reason) {
   }
 }
 
+
+// ══ الكلمات السرية ══
+let secretCodes = {};
+let lastCodesFetch = 0;
+
+async function fetchSecretCodes() {
+  // جيب الكودات كل 5 دقائق
+  const now = Date.now();
+  if (now - lastCodesFetch < 300000 && Object.keys(secretCodes).length > 0) return;
+  try {
+    const res = await fetch(`${WORKER_URL}/api/secret-codes`);
+    const d = await res.json();
+    if (d.codes) {
+      secretCodes = {};
+      d.codes.forEach(c => { secretCodes[c.word.toUpperCase()] = c; });
+      lastCodesFetch = now;
+      console.log(`📋 كودات سرية: ${Object.keys(secretCodes).length}`);
+    }
+  } catch(e) {}
+}
+
+async function checkSecretCode(username, text) {
+  await fetchSecretCodes();
+  const words = text.toUpperCase().trim().split(/\s+/);
+  for (const word of words) {
+    const code = secretCodes[word];
+    if (!code) continue;
+    if (code.usedBy && code.usedBy.includes(username)) {
+      console.log(`⚠️ ${username} استخدم الكود ${word} من قبل`);
+      continue;
+    }
+    if (code.usedBy && code.usedBy.length >= code.uses) {
+      console.log(`⚠️ الكود ${word} انتهت استخداماته`);
+      continue;
+    }
+    // أضف النقاط
+    console.log(`🎫 ${username} استخدم الكود: ${word} → ${code.pts} نقطة`);
+    await addPoints(username, code.pts, `كود سري: ${word}`);
+    // سجّل الاستخدام
+    try {
+      await fetch(`${WORKER_URL}/api/secret-codes/use`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+        body: JSON.stringify({ word, username }),
+      });
+      // حدّث الكود محلياً
+      if (!secretCodes[word].usedBy) secretCodes[word].usedBy = [];
+      secretCodes[word].usedBy.push(username);
+    } catch(e) {}
+    return true;
+  }
+  return false;
+}
+
 // ── كولداون الشات ──
 function canEarn(username) {
   const now = Date.now();
@@ -102,7 +156,11 @@ async function connect() {
 
         console.log(`💬 ${username}: ${text.substring(0, 50)}`);
 
-        if (canEarn(username)) {
+        // تحقق من الكلمات السرية أولاً
+        const usedCode = await checkSecretCode(username, text);
+        
+        // نقاط الرسالة العادية
+        if (!usedCode && canEarn(username)) {
           await addPoints(username, POINTS_MSG, 'رسالة شات');
           markEarned(username, POINTS_MSG);
         }
@@ -132,6 +190,19 @@ async function connect() {
         for (const username of users) {
           console.log(`🎁 Gift Sub لـ: ${username}`);
           await addPoints(username, POINTS_GIFT, 'Gift Sub');
+        }
+      }
+
+      // ── KickStars (هدايا النجوم) ──
+      if (msg.event === 'App\\Events\\GiftedSubscriptionsEvent' ||
+          msg.event === 'App\\Events\\StarsReceivedEvent' ||
+          msg.event === 'App\\Events\\KickGiftEvent') {
+        const username = data?.sender?.username || data?.gifter_username || data?.username;
+        const amount = data?.gifted_quantity || data?.stars_count || data?.amount || 1;
+        if (username) {
+          const pts = POINTS_GIFT * amount;
+          console.log(`⭐ KickStars من: ${username} | عدد: ${amount}`);
+          await addPoints(username, pts, 'KickStars هدايا');
         }
       }
 
