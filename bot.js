@@ -159,8 +159,8 @@ async function connect() {
         // تحقق من الكلمات السرية أولاً
         const usedCode = await checkSecretCode(username, text);
         
-        // نقاط الرسالة العادية
-        if (!usedCode && canEarn(username)) {
+        // نقاط الرسالة فقط لو البث شغال
+        if (!usedCode && canEarn(username) && isStreamLive) {
           await addPoints(username, POINTS_MSG, 'رسالة شات');
           markEarned(username, POINTS_MSG);
         }
@@ -242,6 +242,20 @@ http.createServer((req, res) => {
 // ── تشغيل ──
 console.log('🤖 Kick Bot يبدأ...');
 console.log(`📡 القناة: ${KICK_CHANNEL}`);
+
+// تحقق من حالة البث
+let isStreamLive = false;
+async function checkStreamStatus() {
+  try {
+    const res = await fetch(`${WORKER_URL}/api/settings`);
+    const d = await res.json();
+    isStreamLive = d.streamStatus === 'live';
+  } catch(e) {}
+}
+// تحقق كل دقيقة
+checkStreamStatus();
+setInterval(checkStreamStatus, 60000);
+
 console.log(`💬 نقاط رسالة: ${POINTS_MSG} | ❤️ فولو: ${POINTS_FOLLOW} | 💎 سب: ${POINTS_SUB}`);
 console.log('─────────────────────────────────');
 connect();
