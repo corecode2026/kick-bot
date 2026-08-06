@@ -163,6 +163,7 @@ async function connect() {
         if (!usedCode && canEarn(username) && isStreamLive) {
           await addPoints(username, POINTS_MSG, 'رسالة شات');
           markEarned(username, POINTS_MSG);
+          await logToAdmin('نقاط رسالة', username + ' — ' + POINTS_MSG + ' نقطة');
         }
       }
 
@@ -172,6 +173,7 @@ async function connect() {
         if (!username) return;
         console.log(`❤️ فولو جديد: ${username}`);
         await addPoints(username, POINTS_FOLLOW, 'فولو');
+        await logToAdmin('نقاط فولو', username + ' — ' + POINTS_FOLLOW + ' نقطة');
       }
 
       // ── سبسكريب/دعم ──
