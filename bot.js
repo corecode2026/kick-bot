@@ -251,12 +251,14 @@ async function checkStreamStatus() {
   try {
     const res = await fetch(`${WORKER_URL}/api/settings`);
     const d = await res.json();
+    const prev = isStreamLive;
     isStreamLive = d.streamStatus === 'live';
+    if (prev !== isStreamLive) console.log(`🔴 البث: ${isStreamLive ? 'شغال' : 'مطفي'}`);
   } catch(e) {}
 }
-// تحقق كل دقيقة
+// تحقق كل 15 ثانية
 checkStreamStatus();
-setInterval(checkStreamStatus, 60000);
+setInterval(checkStreamStatus, 15000);
 
 console.log(`💬 نقاط رسالة: ${POINTS_MSG} | ❤️ فولو: ${POINTS_FOLLOW} | 💎 سب: ${POINTS_SUB}`);
 console.log('─────────────────────────────────');
