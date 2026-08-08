@@ -23,7 +23,7 @@ async function addPoints(username, amount, reason) {
   try {
     const res = await fetch(`${WORKER_URL}/api/admin/points-add`, {
       method:  'POST',
-      headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+      headers: { 'Content-Type': 'application/json', 'x-bot-key': process.env.BOT_KEY || ADMIN_KEY },
       body:    JSON.stringify({ username, amount }),
     });
     const d = await res.json();
@@ -75,7 +75,7 @@ async function checkSecretCode(username, text) {
     try {
       await fetch(`${WORKER_URL}/api/secret-codes/use`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-key': ADMIN_KEY },
+        headers: { 'Content-Type': 'application/json', 'x-bot-key': process.env.BOT_KEY || ADMIN_KEY },
         body: JSON.stringify({ word, username }),
       });
       // حدّث الكود محلياً
