@@ -160,7 +160,7 @@ async function connect() {
         const usedCode = await checkSecretCode(username, text);
         
         // نقاط الرسالة فقط لو البث شغال
-        if (!usedCode && canEarn(username) && isStreamLive) {
+        if (!usedCode && canEarn(username)) {
           await addPoints(username, POINTS_MSG, 'رسالة شات');
           markEarned(username, POINTS_MSG);
           await logToAdmin('نقاط رسالة', username + ' — ' + POINTS_MSG + ' نقطة');
