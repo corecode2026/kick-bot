@@ -283,12 +283,6 @@ function markPresence(username) {
   presenceCooldown.set(username, Date.now());
 }
 
-// ══ Keep-Alive ══
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
-  res.end('Bot is alive!');
-});
-server.listen(process.env.PORT || 3000);
 
 // Self-ping كل 10 دقائق
 const RENDER_URL = process.env.RENDER_EXTERNAL_URL || '';
