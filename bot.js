@@ -260,6 +260,26 @@ async function checkStreamStatus() {
 checkStreamStatus();
 setInterval(checkStreamStatus, 15000);
 
+
+// ══ Keep-Alive ══
+const http = require('http');
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Bot is alive!');
+});
+server.listen(process.env.PORT || 3000);
+
+// Self-ping كل 10 دقائق
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || '';
+if (RENDER_URL) {
+  setInterval(async () => {
+    try {
+      await fetch(RENDER_URL);
+      console.log('🏓 keep-alive ping');
+    } catch(e) {}
+  }, 600000);
+}
+
 console.log(`💬 نقاط رسالة: ${POINTS_MSG} | ❤️ فولو: ${POINTS_FOLLOW} | 💎 سب: ${POINTS_SUB}`);
 console.log('─────────────────────────────────');
 connect();
