@@ -159,6 +159,14 @@ async function connect() {
         // تحقق من الكلمات السرية أولاً
         const usedCode = await checkSecretCode(username, text);
         
+        // نقاط الحضور
+        const presenceWords = ['هنا', 'حاضر', '!هنا', '!حاضر', 'here', '!here'];
+        if (presenceWords.includes(text.trim().toLowerCase()) && canClaimPresence(username)) {
+          await addPoints(username, POINTS_PRESENCE, 'نقاط حضور');
+          markPresence(username);
+          console.log(`✅ حضور: ${username} +${POINTS_PRESENCE}`);
+        }
+        
         // نقاط الرسالة فقط لو البث شغال
         if (!usedCode && canEarn(username)) {
           await addPoints(username, POINTS_MSG, 'رسالة شات');
@@ -260,6 +268,20 @@ async function checkStreamStatus() {
 checkStreamStatus();
 setInterval(checkStreamStatus, 15000);
 
+
+
+// ══ نقاط الحضور ══
+const POINTS_PRESENCE = Number(process.env.POINTS_PRESENCE) || 10;
+const presenceCooldown = new Map(); // userId -> timestamp
+
+function canClaimPresence(username) {
+  const last = presenceCooldown.get(username) || 0;
+  return Date.now() - last >= 3600000; // ساعة كاملة
+}
+
+function markPresence(username) {
+  presenceCooldown.set(username, Date.now());
+}
 
 // ══ Keep-Alive ══
 const http = require('http');
