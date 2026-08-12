@@ -6,6 +6,10 @@ const fetch     = require('node-fetch');
 
 const KICK_CHANNEL   = process.env.KICK_CHANNEL   || 'Aboodadwan7';
 const WORKER_URL     = process.env.WORKER_URL     || 'https://storekick1-auth.hk983480.workers.dev';
+// ⚠️ لو ما ضبطت ADMIN_KEY أو BOT_KEY كـ environment variable عند مزوّد الاستضافة
+// (Render مثلاً)، البوت رح يستخدم هالقيمة الافتراضية القديمة — وهي معروفة/مكشوفة.
+// بعد ما تغيّر ADMIN_KEY بـ Cloudflare، لازم تضبط BOT_KEY هون بنفس القيمة الجديدة
+// من متغيرات البيئة عند Render (Settings → Environment)، مش بالكود مباشرة.
 const ADMIN_KEY      = process.env.ADMIN_KEY      || 'kickadmin2026secret';
 const POINTS_MSG     = Number(process.env.POINTS_MSG)    || 5;    // نقاط لكل رسالة
 const POINTS_FOLLOW  = Number(process.env.POINTS_FOLLOW) || 50;   // نقاط الفولو
@@ -19,17 +23,33 @@ const cooldowns = new Map();
 const hourly    = new Map();
 
 // ── نضيف نقاط عبر الـ Worker ──
-async function addPoints(username, amount, reason) {
+// kickId اختياري: رقم حساب Kick الثابت (data.sender.id من رسائل الشات) — لو توفر،
+// السيرفر بيطابق فيه مباشرة بدل الاسم النصي، فبيشتغل صح حتى لو الاسم المعروض
+// بالشات مختلف شوي عن اسم الحساب المسجّل فيه (مسافات، حروف كبيرة/صغيرة...)
+async function addPoints(username, amount, reason, kickId) {
   try {
     const res = await fetch(`${WORKER_URL}/api/admin/points-add`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'x-bot-key': process.env.BOT_KEY || ADMIN_KEY },
-      body:    JSON.stringify({ username, amount }),
+      body:    JSON.stringify({ username, amount, kickId }),
     });
     const d = await res.json();
     console.log(`⭐ ${username} +${amount} نقطة (${reason}) | ${d.status === 'added' ? '✅ أضيفت' : '⏳ محفوظة'}`);
   } catch(e) {
     console.error(`❌ فشل إضافة نقاط لـ ${username}:`, e.message);
+  }
+}
+
+// ── سجّل نشاط بالسجل اللي شايفه الأدمن بلوحة الإدارة (كانت هاي الدالة ناقصة) ──
+async function logToAdmin(action, details) {
+  try {
+    await fetch(`${WORKER_URL}/api/bot/log`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action, details }),
+    });
+  } catch(e) {
+    // ما نوقف تشغيل البوت لو فشل تسجيل النشاط بس
   }
 }
 
@@ -151,6 +171,7 @@ async function connect() {
       // ── رسالة شات ──
       if (msg.event === 'App\\Events\\ChatMessageEvent') {
         const username = data?.sender?.username;
+        const kickId   = data?.sender?.id; // رقم حساب Kick الثابت — يستخدم للمطابقة الدقيقة
         const text     = data?.content;
         if (!username || !text || text.length < 2) return;
 
@@ -162,14 +183,14 @@ async function connect() {
         // نقاط الحضور
         const presenceWords = ['هنا', 'حاضر', '!هنا', '!حاضر', 'here', '!here'];
         if (presenceWords.includes(text.trim().toLowerCase()) && canClaimPresence(username)) {
-          await addPoints(username, POINTS_PRESENCE, 'نقاط حضور');
+          await addPoints(username, POINTS_PRESENCE, 'نقاط حضور', kickId);
           markPresence(username);
           console.log(`✅ حضور: ${username} +${POINTS_PRESENCE}`);
         }
         
         // نقاط الرسالة فقط لو البث شغال
         if (!usedCode && canEarn(username)) {
-          await addPoints(username, POINTS_MSG, 'رسالة شات');
+          await addPoints(username, POINTS_MSG, 'رسالة شات', kickId);
           markEarned(username, POINTS_MSG);
           await logToAdmin('نقاط رسالة', username + ' — ' + POINTS_MSG + ' نقطة');
         }
@@ -178,20 +199,22 @@ async function connect() {
       // ── فولو جديد ──
       if (msg.event === 'App\\Events\\FollowersUpdated' || msg.event === 'App\\Events\\UserFollowsChannel') {
         const username = data?.user?.username || data?.username;
+        const kickIdF  = data?.user?.id || data?.id;
         if (!username) return;
         console.log(`❤️ فولو جديد: ${username}`);
-        await addPoints(username, POINTS_FOLLOW, 'فولو');
+        await addPoints(username, POINTS_FOLLOW, 'فولو', kickIdF);
         await logToAdmin('نقاط فولو', username + ' — ' + POINTS_FOLLOW + ' نقطة');
       }
 
       // ── سبسكريب/دعم ──
       if (msg.event === 'App\\Events\\SubscriptionEvent' || msg.event === 'App\\Events\\StreamerIsLive') {
         const username = data?.user?.username || data?.username;
+        const kickIdS  = data?.user?.id || data?.id;
         if (!username) return;
         const isGift = data?.is_gift || false;
         const pts    = isGift ? POINTS_GIFT : POINTS_SUB;
         console.log(`💎 سب${isGift ? ' (هدية)' : ''}: ${username}`);
-        await addPoints(username, pts, isGift ? 'Gift Sub' : 'سبسكريب');
+        await addPoints(username, pts, isGift ? 'Gift Sub' : 'سبسكريب', kickIdS);
       }
 
       // ── Superchat/دعم مالي ──
@@ -208,11 +231,12 @@ async function connect() {
           msg.event === 'App\\Events\\StarsReceivedEvent' ||
           msg.event === 'App\\Events\\KickGiftEvent') {
         const username = data?.sender?.username || data?.gifter_username || data?.username;
+        const kickIdK  = data?.sender?.id || data?.gifter_id;
         const amount = data?.gifted_quantity || data?.stars_count || data?.amount || 1;
         if (username) {
           const pts = POINTS_GIFT * amount;
           console.log(`⭐ KickStars من: ${username} | عدد: ${amount}`);
-          await addPoints(username, pts, 'KickStars هدايا');
+          await addPoints(username, pts, 'KickStars هدايا', kickIdK);
         }
       }
 
