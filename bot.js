@@ -160,7 +160,7 @@ async function connect() {
         const usedCode = await checkSecretCode(username, text);
         
         // نقاط الحضور
-        const presenceWords = ['هنا', 'حاضر', '!هنا', '!حاضر', 'here', '!here'];
+        const presenceWords = ['عبود', 'حاضر', '!عبود', '!حاضر', 'here', '!here'];
         if (presenceWords.includes(text.trim().toLowerCase()) && canClaimPresence(username)) {
           await addPoints(username, POINTS_PRESENCE, 'نقاط حضور');
           markPresence(username);
