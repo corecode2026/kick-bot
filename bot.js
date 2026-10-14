@@ -144,6 +144,9 @@ async function getChannelInfo() {
 }
 
 // ── اتصال WebSocket ──
+// Pusher بيرجّع 4001 إذا الـ cluster غلط — فبنجرب الـ clusters بالدور لحد ما واحد يشتغل
+const PUSHER_CLUSTERS = [...new Set([process.env.PUSHER_CLUSTER, 'us2', 'us3', 'mt1', 'eu', 'ap1', 'ap2', 'ap3', 'ap4', 'sa1'].filter(Boolean))];
+let clusterIdx = 0;
 async function connect() {
   const chatroomId = await getChannelInfo();
   if (!chatroomId) {
@@ -153,7 +156,9 @@ async function connect() {
   }
 
   const PUSHER_KEY = process.env.PUSHER_KEY || '32cbd69e4b950bf97679';
-  const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'us2';
+  const PUSHER_CLUSTER = PUSHER_CLUSTERS[clusterIdx % PUSHER_CLUSTERS.length];
+  console.log('🌐 تجربة Pusher cluster:', PUSHER_CLUSTER);
+  let gotError4001 = false;
   const ws = new WebSocket(`wss://ws-${PUSHER_CLUSTER}.pusher.com/app/${PUSHER_KEY}?protocol=7&client=js&version=8.4.0-rc2&flash=false`);
   let pingTimer = null;
 
@@ -169,8 +174,8 @@ async function connect() {
     try {
       const msg  = JSON.parse(raw.toString());
       const data = typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data;
-      if (msg.event === 'pusher:error') console.log('⚠️ Pusher error:', JSON.stringify(msg.data));
-      if (msg.event === 'pusher:connection_established') console.log('✅ Pusher connection established');
+      if (msg.event === 'pusher:error') { console.log('⚠️ Pusher error:', JSON.stringify(msg.data)); if (data && data.code === 4001) gotError4001 = true; }
+      if (msg.event === 'pusher:connection_established') console.log('✅ Pusher connection established على cluster:', PUSHER_CLUSTER);
       if (!data) return;
 
       // ── رسالة شات ──
@@ -262,6 +267,7 @@ async function connect() {
 
   ws.on('close', (code, reason) => {
     clearInterval(pingTimer);
+    if (gotError4001 || code === 4001) { clusterIdx++; setTimeout(connect, 1500); return; }
     console.log(`🔴 انقطع (${code}) ${reason ? reason.toString() : ''} — إعادة الاتصال بعد 10 ثواني...`);
     setTimeout(connect, 10000);
   });
