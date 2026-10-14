@@ -129,13 +129,18 @@ function markEarned(username, pts) {
 }
 
 // ── جيب معلومات القناة ──
+let cachedChatroomId = process.env.CHATROOM_ID || '17216022'; // معروف مسبقاً — احتياط لما Kick يحجب الطلب
 async function getChannelInfo() {
+  if (cachedChatroomId) return cachedChatroomId;
   try {
-    const res  = await fetch(`https://kick.com/api/v2/channels/${KICK_CHANNEL}`);
+    const res  = await fetch(`https://kick.com/api/v2/channels/${KICK_CHANNEL}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36', 'Accept': 'application/json' }
+    });
     const data = await res.json();
     const id   = data?.chatroom?.id;
     if (!id) throw new Error('ما لقينا الـ chatroom');
     console.log(`✅ قناة: ${KICK_CHANNEL} | Chatroom ID: ${id}`);
+    cachedChatroomId = id;
     return id;
   } catch(e) {
     console.error('❌ فشل جلب القناة:', e.message);
