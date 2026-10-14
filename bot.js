@@ -154,7 +154,7 @@ async function connect() {
 
   const PUSHER_KEY = process.env.PUSHER_KEY || '32cbd69e4b950bf97679';
   const PUSHER_CLUSTER = process.env.PUSHER_CLUSTER || 'us2';
-  const ws = new WebSocket(`wss://ws-${PUSHER_CLUSTER}.pusher.com/app/${PUSHER_KEY}?protocol=7&client=js&version=7.6.0&flash=false`);
+  const ws = new WebSocket(`wss://ws-${PUSHER_CLUSTER}.pusher.com/app/${PUSHER_KEY}?protocol=7&client=js&version=8.4.0-rc2&flash=false`);
   let pingTimer = null;
 
   ws.on('open', () => {
